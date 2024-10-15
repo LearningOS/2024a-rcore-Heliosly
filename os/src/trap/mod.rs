@@ -71,6 +71,7 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
         _ => {
             panic!(
                 "Unsupported trap {:?}, stval = {:#x}!",
+
                 scause.cause(),
                 stval
             );

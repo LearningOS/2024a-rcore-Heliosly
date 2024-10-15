@@ -1,8 +1,7 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
-    task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus},
-    timer::get_time_us,
+    config::MAX_SYSCALL_NUM,  task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, TASK_MANAGER}, timer::{get_time_ms, get_time_us}
+   
 };
 
 #[repr(C)]
@@ -21,6 +20,7 @@ pub struct TaskInfo {
     syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
     time: usize,
+    
 }
 
 /// task exits and submit an exit code
@@ -52,6 +52,38 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
+    
     trace!("kernel: sys_task_info");
-    -1
+    let _inner=TASK_MANAGER.inner.exclusive_access().tasks;
+    let mut _id=0;
+   
+    let mut runid=0;
+    {
+        let a=TASK_MANAGER.inner.exclusive_access().tasks;
+        for (i,task) in a.iter().enumerate(){
+            if task.task_status==TaskStatus::Running{
+                runid=i;
+                break;
+            }
+        }
+    }
+    {
+        let a=TASK_MANAGER.st.exclusive_access()[runid];
+        unsafe {
+       ( *(_ti)).status=TaskStatus::Running;
+       ( *(_ti)).time= get_time_ms()-a;
+       //println!("time:{} and gettime:{}",a,get_time_ms());
+    } 
+    }
+    {
+        unsafe {
+           let _a=TASK_MANAGER.list.exclusive_access()[runid];
+           for (sys,cnt) in _a{
+            ( *(_ti)).syscall_times[sys]=cnt;
+           }
+
+        }
+    }
+    
+    0
 }

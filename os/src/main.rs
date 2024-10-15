@@ -95,6 +95,7 @@ fn kernel_log_info() {
 #[no_mangle]
 /// the rust entry-point of os
 pub fn rust_main() -> ! {
+   
     clear_bss();
     kernel_log_info();
     heap_alloc::init_heap();

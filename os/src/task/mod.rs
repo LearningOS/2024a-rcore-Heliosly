@@ -14,6 +14,8 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+
+
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
@@ -34,26 +36,33 @@ pub use context::TaskContext;
 /// existing functions on `TaskManager`.
 pub struct TaskManager {
     /// total number of tasks
-    num_app: usize,
+    pub num_app: usize,
     /// use inner value to get mutable access
-    inner: UPSafeCell<TaskManagerInner>,
+    pub inner: UPSafeCell<TaskManagerInner>,
+    ///a
+    pub st :UPSafeCell<[usize;MAX_APP_NUM]>,
+     ///a
+    pub list:UPSafeCell<[[(usize,u32);5];MAX_APP_NUM]>
 }
 
 /// Inner of Task Manager
 pub struct TaskManagerInner {
     /// task list
-    tasks: [TaskControlBlock; MAX_APP_NUM],
+    pub tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
-    current_task: usize,
+    pub current_task: usize,
 }
 
 lazy_static! {
     /// Global variable: TASK_MANAGER
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
+        
+        
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -67,12 +76,30 @@ lazy_static! {
                     current_task: 0,
                 })
             },
+            
+            st: unsafe{
+                UPSafeCell::new([0; MAX_APP_NUM]) 
+            },
+            list: unsafe {
+                
+                UPSafeCell::new([[(64,0),(93,0),(124,0),(169,0),(410,0)]; MAX_APP_NUM]) 
+            }
         }
     };
 }
 
 impl TaskManager {
-    /// Run the first task in task list.
+    /// modfy
+    pub fn modfy(&self,_index:usize,_sysid:usize){
+    
+     
+    //    { 
+    //     let a=self.inner.exclusive_access().tasks[index].list[0];
+    //     println!("sys:64:{},{}",a.0,a.1);
+    //    }
+    }
+    
+    /// Run the first task   in task list.
     ///
     /// Generally, the first task in task list is an idle task (we call it zero process later).
     /// But in ch3, we load apps statically, so the first task is a real app.
@@ -99,6 +126,23 @@ impl TaskManager {
 
     /// Change the status of current `Running` task into `Exited`.
     fn mark_current_exited(&self) {
+        let mut runid=0;
+    {
+        let a=TASK_MANAGER.inner.exclusive_access().tasks;
+        for (i,task) in a.iter().enumerate(){
+            if task.task_status==TaskStatus::Running{
+                runid=i;
+                break;
+            }
+        }
+    }
+        {
+           TASK_MANAGER.list.exclusive_access()[runid]=[(64,0),(93,0),(124,0),(169,0),(410,0)];
+        }
+        
+        {
+            TASK_MANAGER.st.exclusive_access()[runid]=0;
+        }
         let mut inner = self.inner.exclusive_access();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Exited;
