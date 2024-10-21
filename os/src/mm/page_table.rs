@@ -72,6 +72,38 @@ pub struct PageTable {
 
 /// Assume that it won't oom when creating/mapping.
 impl PageTable {
+    pub fn judge1(&self,vpn:VirtPageNum)->bool{
+      let pte=self.find_pte(vpn);
+      match pte {
+          Some(_a)=>{
+            
+            _a.is_valid()
+                
+            
+          },
+          None=>{
+            false
+          }
+      }
+     
+      
+    }
+    pub fn judge2(&self,vpn:VirtPageNum)->bool{
+        let pte=self.find_pte(vpn);
+        match pte {
+            Some(_a)=>{
+              
+              !_a.is_valid()
+              
+              
+            },
+            None=>{
+              true
+            }
+        }
+       
+        
+      }
     /// Create a new page table
     pub fn new() -> Self {
         let frame = frame_alloc().unwrap();

@@ -40,6 +40,38 @@ pub struct MemorySet {
 }
 
 impl MemorySet {
+     ///s
+     pub fn ca(&mut self,start: VirtPageNum){
+        
+        for _area in &mut self.areas{
+            if _area.vpn_range.get_start()==start{
+             (*_area).unmap(&mut self.page_table);
+             break;
+            }
+        }
+
+     }
+    ///s
+    pub fn errjudge(&self,start:VirtAddr,end:VirtAddr,status:bool)->bool{
+        let start_vpn=start.floor();
+        let end_vpn=end.ceil();
+        let vpn_range = VPNRange::new(start_vpn, end_vpn);
+        if status
+       { for vpn in vpn_range{
+         if self.page_table.judge1(vpn){
+            return true;
+         }
+        }}
+        else{
+            for vpn in vpn_range{
+                if self.page_table.judge2(vpn){
+                   return true;
+                }
+               }
+
+        }
+        false
+        }
     /// Create a new empty `MemorySet`.
     pub fn new_bare() -> Self {
         Self {

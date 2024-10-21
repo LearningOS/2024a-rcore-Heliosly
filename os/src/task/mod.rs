@@ -14,11 +14,16 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+
+
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{self, MapPermission};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
+
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -38,6 +43,8 @@ pub struct TaskManager {
     num_app: usize,
     /// use inner value to get mutable access
     inner: UPSafeCell<TaskManagerInner>,
+    innersysc:UPSafeCell<Vec<[(usize,u32);8]>>,
+    innerst:UPSafeCell<Vec<usize>>,
 }
 
 /// The task manager inner in 'UPSafeCell'
@@ -55,8 +62,14 @@ lazy_static! {
         let num_app = get_num_app();
         println!("num_app = {}", num_app);
         let mut tasks: Vec<TaskControlBlock> = Vec::new();
+        let mut start:Vec<usize> = Vec::new();
+        let mut sysc:Vec<[(usize,u32);8]>= Vec::new();
         for i in 0..num_app {
             tasks.push(TaskControlBlock::new(get_app_data(i), i));
+            start.push(0);
+            sysc.push(
+                  [(214,0),(215,0),(222,0),(410,0),(169,0),(93,0),(64,0),(124,0)]
+            )
         }
         TaskManager {
             num_app,
@@ -65,12 +78,113 @@ lazy_static! {
                     tasks,
                     current_task: 0,
                 })
+            
             },
+            innerst: unsafe{
+                UPSafeCell::new(
+                    start
+                )
+            },
+            innersysc: unsafe{
+                UPSafeCell::new(
+                    sysc
+                )
+            }
         }
     };
 }
 
 impl TaskManager {
+    /// Get the current memset.
+    pub fn unloc(&self,_start: mm::VirtAddr, _end: mm::VirtAddr)->bool {
+        let mut inner = self.inner.exclusive_access();
+        let id;
+        { 
+           id=inner.current_task;
+        }
+        {
+            if inner.tasks[id].memory_set.errjudge(_start,_end,false)
+           {
+             return true;
+            }
+
+        }
+       
+        inner.tasks[id].memory_set.ca(_start.floor());
+        
+       
+        false
+    }
+    /// Get the current memset.
+    pub fn loc(&self,_start: mm::VirtAddr, _end: mm::VirtAddr, port: MapPermission)->bool {
+        let mut inner = self.inner.exclusive_access();
+        let id;
+        { 
+           id=inner.current_task;
+        }
+        {
+            if inner.tasks[id].memory_set.errjudge(_start,_end,true)
+           {
+             return true;
+            }
+
+        }
+        inner.tasks[id].memory_set.insert_framed_area(_start, _end, port);
+        false
+    }
+    ///f 
+    fn deletinfo(&self){
+        let id;
+        {
+            id=self.inner.exclusive_access().current_task;
+        }
+        self.innerst.exclusive_access()[id]=0;
+    }
+    ///f
+    pub  fn readinfo (&self)->(usize,[(usize,u32);8]){
+         let id;
+         {
+            id=self.inner.exclusive_access().current_task;
+         }
+         let time;
+         {
+            time=get_time_ms()-self.innerst.exclusive_access()[id];
+         }
+        let times ;
+         {
+            times=self.innersysc.exclusive_access()[id];
+         }
+         (time,times)
+
+    }
+
+
+    ///s
+    pub fn modicall(&self,id :usize){
+        let curid;
+          {curid=self.inner.exclusive_access().current_task;}
+        
+        {
+          for sys in self.innersysc.exclusive_access()[curid].as_mut(){
+                if sys.0==id{
+                    sys.1+=1;
+                }
+          }
+           
+        }
+         {
+            let mut a=self.innerst.exclusive_access();
+            let b=a[curid];
+            if b==0{
+              {
+                 *(a.get_mut(curid).unwrap())=get_time_ms();
+
+              }
+            }
+
+         }
+          
+    }
     /// Run the first task in task list.
     ///
     /// Generally, the first task in task list is an idle task (we call it zero process later).
@@ -154,7 +268,6 @@ impl TaskManager {
         }
     }
 }
-
 /// Run the first task in task list.
 pub fn run_first_task() {
     TASK_MANAGER.run_first_task();
@@ -173,6 +286,7 @@ fn mark_current_suspended() {
 
 /// Change the status of current `Running` task into `Exited`.
 fn mark_current_exited() {
+    TASK_MANAGER.deletinfo();
     TASK_MANAGER.mark_current_exited();
 }
 
