@@ -37,6 +37,39 @@ pub struct MemorySet {
 }
 
 impl MemorySet {
+    ///asdas
+    pub fn unmap_peek(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+    )->bool{
+
+        let var=VPNRange::new(start_va.floor(),end_va.ceil());
+        
+        for vpn in var{
+            let pte=self.page_table.find_pte(vpn);
+         match pte{
+            Some(p)=>{
+                if !p.is_valid(){
+                    return true
+                }
+
+            }
+            None=>{
+                return true
+            }
+         }
+        }
+
+        for area in &mut self.areas{
+            if area.vpn_range.get_start()==start_va.floor(){
+                (*area).unmap(&mut self.page_table);
+                break;
+            }
+
+        }
+        false
+    }
     /// Create a new empty `MemorySet`.
     pub fn new_bare() -> Self {
         Self {
@@ -49,6 +82,30 @@ impl MemorySet {
         self.page_table.token()
     }
     /// Assume that no conflicts.
+    pub fn insert_framed_area_peek(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    )->bool{
+
+        let var=VPNRange::new(start_va.floor(),end_va.ceil());
+        
+        for vpn in var{
+            let pte=self.page_table.find_pte(vpn);
+         
+                if let Some(a)= pte{
+                    if  a.is_valid() {
+                        return true;
+                    }
+               
+                
+            }
+        }
+        self.insert_framed_area(start_va, end_va, permission);
+        false
+    }
+    /// asd
     pub fn insert_framed_area(
         &mut self,
         start_va: VirtAddr,
@@ -83,7 +140,7 @@ impl MemorySet {
         self.areas.push(map_area);
     }
     /// Mention that trampoline is not collected by areas.
-    fn map_trampoline(&mut self) {
+    pub fn map_trampoline(&mut self) {
         self.page_table.map(
             VirtAddr::from(TRAMPOLINE).into(),
             PhysAddr::from(strampoline as usize).into(),
